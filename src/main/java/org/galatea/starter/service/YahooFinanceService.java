@@ -70,7 +70,8 @@ public class YahooFinanceService {
           case INVALID_TICKER:
             return null;
           default:
-            // TODO: Unsure of what exception to throw here, but this should only happen if the AV data is formatted wrong
+            // TODO: Unsure of what exception to throw here, but this should only happen if the
+            //  AV data is formatted wrong
             throw new DataFormatException();
         }
       }
@@ -119,11 +120,11 @@ public class YahooFinanceService {
   }
 
   /**
-   * Retrieves price data for the last 100 days from AlphaVantage for the indicated ticker
+   * Retrieves price data for the last 100 days from AlphaVantage for the indicated ticker.
    *
    * @param ticker The ticker representing the requested stock
    * @return a ServiceCode Enum indicating the outcome of the attempt to retrieve the data from
-   * AlphaVantage and add it to the MySQL database.
+   *     AlphaVantage and add it to the MySQL database.
    */
   private ServiceCodes getFromWeb(final String ticker) {
     String alphaVantageKey = "KBOP9W9HW83OI5DP";
@@ -131,7 +132,8 @@ public class YahooFinanceService {
     // Build the URL
     String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol="
         + ticker
-        + "&outputsize=compact&apikey=" // "compact" gets last 100 days, "full" gets all 20+ years of info
+        // "compact" gets last 100 days, "full" gets all 20+ years of info
+        + "&outputsize=compact&apikey="
         + alphaVantageKey;
 
     // Get the data from AlphaVantage

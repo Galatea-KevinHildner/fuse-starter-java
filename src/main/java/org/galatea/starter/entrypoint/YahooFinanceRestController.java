@@ -48,9 +48,9 @@ public class YahooFinanceRestController extends BaseRestController {
     SimpleDateFormat form = new SimpleDateFormat("yyyy-MM-dd");
     Request req = new Request(ticker, days, idTracker, form.format(new Date()));
     LinkedList<PriceInfo> res;
-    try{
+    try {
       res = yahooFinanceService.handleRequest(req);
-    } catch(DataFormatException e){
+    } catch (DataFormatException e) {
       res = null;
     }
     return res;
