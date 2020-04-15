@@ -12,7 +12,7 @@ public class PriceInfoTest {
   int valInt = 300;
 
   @Test
-  public void invalidTicker(){
+  public void invalidTicker() {
     String[] badTickers = {"M2FT", "MSFTT",""};
     for (String badTicker : badTickers) {
       try {
@@ -25,7 +25,7 @@ public class PriceInfoTest {
   }
 
   @Test
-  public void invalidDates(){
+  public void invalidDates() {
     String[] badDates = {"202-04-14","2020-0-14","2020-04-2","","--","20201-04-14","2020-021-14",
         "2020-04-123","yyyy-04-14","2020-mm-14","2020-04-dd","2020/04/14"};
     for (String badDate : badDates) {
@@ -39,41 +39,40 @@ public class PriceInfoTest {
   }
 
   @Test
-  public void invalidStockValues(){
-    try{
+  public void invalidStockValues() {
+    try {
       new PriceInfo(valTicker, valDate, -1.0, valDouble, valDouble, valDouble, valInt);
       fail();
-    } catch(IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
-    try{
+    try {
       new PriceInfo(valTicker, valDate, valDouble, -1.0, valDouble, valDouble, valInt);
       fail();
-    } catch(IllegalArgumentException e){
+    } catch(IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
-    try{
+    try {
       new PriceInfo(valTicker, valDate, valDouble, valDouble, -1.0, valDouble, valInt);
       fail();
-    } catch(IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
-    try{
+    try {
       new PriceInfo(valTicker, valDate, valDouble, valDouble, valDouble, -1.0, valInt);
       fail();
-    } catch(IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
-    try{
+    try {
       new PriceInfo(valTicker, valDate, valDouble, valDouble, valDouble, valDouble, -1);
       fail();
-    } catch(IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
   }
-
 }
