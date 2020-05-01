@@ -1,7 +1,5 @@
 # Global properties go here
 spring:
-   profiles:
-      active: test
    main:
       allow-bean-definition-overriding: true
    datasource:
@@ -9,8 +7,14 @@ spring:
       # in case you want to use H2 with a file persistence or as a service
       # reference http://www.h2database.com/html/cheatSheet.html and
       # http://www.h2database.com/html/tutorial.html#using_server
-      url: jdbc:h2:mem:testtest
       driver-class-name: org.h2.Driver
+      url: jdbc:mysql://localhost:3306/result_database
+      database-profile: root
+      password: Galatea123
+      alphavantage-url: >
+         https://www.alphavantage.co/query?function=TIME_SERIES_DAILY
+         &symbol=%s&outputsize=compact&apikey=KBOP9W9HW83OI5DP
+
    jpa:
       hibernate:
          ddl-auto: update
@@ -57,6 +61,8 @@ spring:
       password:
    rest:
       iexBasePath: https://api.iextrading.com/1.0
+
+---
 # set debug to get spring to log the classpath (and other things) on startup
 debug: true
 

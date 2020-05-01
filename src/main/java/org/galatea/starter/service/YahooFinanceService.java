@@ -1,83 +1,79 @@
 package org.galatea.starter.service;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.DataFormatException;
 import lombok.extern.slf4j.Slf4j;
-import org.galatea.starter.utils.JavaUrlConnectionReader;
-import org.galatea.starter.utils.ServiceCodes;
-import org.galatea.starter.utils.yahoofinancedata.PriceInfo;
+import org.galatea.starter.utils.AlphaVantage.AlphaVantageHandler;
+import org.galatea.starter.utils.ServiceCode;
+import org.galatea.starter.utils.yahoofinancedata.DailyStockInfo;
+import org.galatea.starter.utils.yahoofinancedata.PriceData;
 import org.galatea.starter.utils.yahoofinancedata.Request;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
 public class YahooFinanceService {
 
-  private Connection mySqlConn;
-
-  /**
-   * Establishes a connection to the results database upon creation.
-   */
-  public YahooFinanceService() {
-    String dataBaseUrl = "jdbc:mysql://localhost:3306/result_database";
-    String dataBasePW = "Galatea123";
-    String dataBaseUser = "root";
-
-    log.info("Attempting to connect to result database");
-    try {
-      this.mySqlConn = DriverManager.getConnection(dataBaseUrl, dataBaseUser, dataBasePW);
-    } catch (SQLException e) {
-      log.error("Unable to establish connection to result database");
-    }
-    log.info("Successfully connected to result database");
-  }
+  @Value("spring.datasource.url")
+  private String url;
+  @Value("spring.datasource.database-profile")
+  private String databaseProfile;
+  @Value("spring.datasource.password")
+  private String databasePassword;
 
   /**
    * Attempts to collect the data specified in the Request object.
    *
-   * @param req The object representing the requested stock information
+   * @param request The object representing the requested stock information
    * @return LinkedList of PriceInfo objects that contain the requested information
    */
-  public LinkedList<PriceInfo> handleRequest(final Request req) throws DataFormatException {
+  public List<DailyStockInfo> handleRequest(final Request request) throws DataFormatException, SQLException {
     // Extract request info
-    int days = req.getDays();
+    int days = request.getDays();
     String date;
-    String ticker = req.getTicker();
+    String ticker = request.getTicker();
 
-    LinkedList<PriceInfo> resList = new LinkedList<>();
-    PriceInfo current;
+    List<DailyStockInfo> resultList = new ArrayList<DailyStockInfo>();
 
     for (int i = 0; i <= days; i++) {
-      date = dateMath(req.getDate(), (-1 * i));
-      current = getFromDatabase(ticker, date);
+      date = dateMath(request.getDate(), (-1 * i));
+      DailyStockInfo current = getInfoFromDatabase(ticker, date);
 
       if (current == null) { // Ticker and date combination not found in database
-        switch (getFromWeb(ticker)) { // Get updated stock information from AlphaVantage
+        ServiceCode retrievalResult = gatherInfoFromWeb(ticker);
+        switch (retrievalResult) {
           case SUCCESS:
-            current = getFromDatabase(ticker, date);
+            current = getInfoFromDatabase(ticker, date);
             break;
           case INVALID_TICKER:
             return null;
+          case INVALID_DATA_RECIEVED:
+            log.error("api for retrieving stock information returned an incorrect format");
+            throw new DataFormatException("data from the web was incorrectly formatted");
           default:
-            // TODO: Unsure of what exception to throw here, but this should only happen if the
-            //  AV data is formatted wrong
-            throw new DataFormatException();
+            log.error("gatherInfoFromWeb returned an unexpected service code");
+            throw new DataFormatException("unexpected service code entered into switch case");
         }
       }
-      resList.add(current);
+      resultList.add(current);
     }
-    return resList;
+    return resultList;
   }
 
   /**
@@ -88,35 +84,31 @@ public class YahooFinanceService {
    * @return PriceInfo object representing the specified stock on the specified date. Returns null
    *     if there is no matching entry in the database.
    */
-  private PriceInfo getFromDatabase(final String ticker, final String date) {
-    double open = -1.0;
-    double high = -1.0;
-    double low = -1.0;
-    double close = -1.0;
-    int volume = -1;
-
+  private DailyStockInfo getInfoFromDatabase(final String ticker, final String date) throws SQLException {
     try {
-      Statement myStmt = mySqlConn.createStatement();
-      String sql =
-          "SELECT * FROM stocks WHERE name = \"" + ticker + "\" AND day = \"" + date + "\"";
-      ResultSet rs = myStmt.executeQuery(sql);
+      Connection mySqlConnection = DriverManager.getConnection(url, databaseProfile, databasePassword);
 
-      if (!rs.next()) {
-        return null; // No results found in the database
-      } else {
-        // Extract data from the result set
-        rs.next();
-        open = rs.getDouble("open");
-        high = rs.getDouble("high");
-        low = rs.getDouble("low");
-        close = rs.getDouble("close");
-        volume = rs.getInt("volume");
+      String requestString = "SELECT * FROM stocks WHERE name =? AND day =?";
+      PreparedStatement requestStatement = mySqlConnection.prepareStatement(requestString);
+      requestStatement.setString(1, ticker);
+      requestStatement.setString(2, date);
+
+      ResultSet rs = requestStatement.executeQuery();
+      DailyStockInfo result = null;
+      if (rs.next()) {
+        double open = rs.getDouble("open");
+        double high = rs.getDouble("high");
+        double low = rs.getDouble("low");
+        double close = rs.getDouble("close");
+        int volume = rs.getInt("volume");
+        result =  new DailyStockInfo(ticker, date, open, high, low, close, volume);
       }
+      closeConnectionObjects(rs, requestStatement, mySqlConnection);
+      return result;
     } catch (SQLException e) {
-      log.error("Unable to create Statement for MySQL database:\n" + e.toString());
+      log.error("unable to complete request to stocks database:\n" + e.toString());
+      throw e;
     }
-
-    return new PriceInfo(ticker, date, open, high, low, close, volume);
   }
 
   /**
@@ -126,126 +118,55 @@ public class YahooFinanceService {
    * @return a ServiceCode Enum indicating the outcome of the attempt to retrieve the data from
    *     AlphaVantage and add it to the MySQL database.
    */
-  private ServiceCodes getFromWeb(final String ticker) {
-    String alphaVantageKey = "KBOP9W9HW83OI5DP";
-
-    // Build the URL
-    String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol="
-        + ticker
-        // "compact" gets last 100 days, "full" gets all 20+ years of info
-        + "&outputsize=compact&apikey="
-        + alphaVantageKey;
-
-    // Get the data from AlphaVantage
-    String rawData = JavaUrlConnectionReader.getUrlContents(url);
-    String avErrMsg = "{\n"
-        + "    \"Error Message\": \"Invalid API call. Please retry or visit the documentation "
-        + "(https://www.alphavantage.co/documentation/) for TIME_SERIES_DAILY.\"\n}\n";
-    if (rawData.equals(avErrMsg)) {
-      log.info("No data was found for the ticker: " + ticker);
-      return ServiceCodes.INVALID_TICKER;
+  private ServiceCode gatherInfoFromWeb(final String ticker) {
+    List<DailyStockInfo> newStockInfo;
+    try {
+      newStockInfo = new AlphaVantageHandler().retrieve(ticker);
+    } catch (IOException e) {
+      return ServiceCode.INVALID_DATA_RECIEVED;
     }
 
-    // Convert raw data into PriceInfo
-    Scanner scan = new Scanner(rawData);
-    for (int i = 0; i <= 8; i++) { // Get rid of the metadata from AlphaVantage
-      if (!scan.hasNextLine()) {
-        log.warn("AlphaVantage MetaData is missing or incorrectly formatted");
-        return ServiceCodes.INVALID_DATA_RECEIVED;
-      }
-      scan.nextLine();
-      // Could add checks for format but it's not too important
+    if (newStockInfo == null) {
+      return ServiceCode.INVALID_TICKER;
     }
 
-    Pattern doubPat = Pattern.compile("[\\d]+.[\\d]+");
-    Matcher m;
-    String sqlStmt;
-    String currentLine;
-    String day;
-    double open = -1.0;
-    double high = -1.0;
-    double low = -1.0;
-    double close = -1.0;
-    int volume = -1;
-
-    log.info("Processing AlphaVantage data and sending it to the Results database");
-    while (scan.hasNextLine()) {
-      //TODO: Optimize for pre-existing entries
-
-      // Day
-      day = scan.nextLine();
-      day = day.substring(day.indexOf("\"") + 1);
-      day = day.substring(0, day.indexOf("\""));
-
-      // Open
-      if (scan.hasNextLine()) {
-        currentLine = scan.nextLine();
-        m = doubPat.matcher(currentLine);
-        if (m.find()) {
-          open = Double.parseDouble(m.group(0));
-        } else {
-          log.warn("Unable to retrieve Open value from AlphaVantage Data");
-        }
+    Connection mySqlConnection;
+    PreparedStatement insertStatement;
+    try {
+      mySqlConnection = DriverManager.getConnection(url, databaseProfile, databasePassword);
+      String insertCommand = "INSERT INTO stocks(name,day,open,high,low,close,volume) "
+          + "VALUES(?,?,?,?,?,?,?)";
+      insertStatement = mySqlConnection.prepareStatement(insertCommand);
+      for(DailyStockInfo newDay : newStockInfo) {
+        addStockToBatch(insertStatement, newDay);
       }
+      insertStatement.executeBatch();
+      return ServiceCode.SUCCESS;
+    } catch (SQLException e) {
+      log.error("failed to insert stocks into database");
 
-      // High
-      if (scan.hasNextLine()) {
-        currentLine = scan.nextLine();
-        m = doubPat.matcher(currentLine);
-        if (m.find()) {
-          high = Double.parseDouble(m.group(0));
-        } else {
-          log.warn("Unable to retrieve High value from AlphaVantage Data");
-        }
-      }
-
-      // Low
-      if (scan.hasNextLine()) {
-        currentLine = scan.nextLine();
-        m = doubPat.matcher(currentLine);
-        if (m.find()) {
-          low = Double.parseDouble(m.group(0));
-        } else {
-          log.warn("Unable to retrieve Low value from AlphaVantage Data");
-        }
-      }
-
-      // Close
-      if (scan.hasNextLine()) {
-        currentLine = scan.nextLine();
-        m = doubPat.matcher(currentLine);
-        if (m.find()) {
-          close = Double.parseDouble(m.group(0));
-        } else {
-          log.warn("Unable to retrieve Close value from AlphaVantage Data");
-        }
-      }
-
-      // Volume
-      if (scan.hasNextLine()) {
-        currentLine = scan.nextLine();
-        m = doubPat.matcher(currentLine);
-        if (m.find()) {
-          volume = Integer.parseInt(m.group(0));
-        } else {
-          log.warn("Unable to retrieve Volume value from AlphaVantage Data");
-        }
-      }
-
-      // Inserts data into MySQL database ignoring duplicate ticker/date combinations
-      sqlStmt = String.format("INSERT IGNORE INTO stocks(name,day,open,high,low,close,volume) "
-          + "VALUES(\"%s\",'%s',%f,%f,%f,%f,%d)", ticker, day, open, high, low, close, volume);
-
-      try {
-        Statement myStmt = mySqlConn.createStatement();
-        myStmt.execute(sqlStmt);
-      } catch (SQLException e) {
-        log.warn("Unable to create Statement for MySQL database:\n" + e.toString());
-      }
+    } finally {
+      closeConnectionObjects(null, insertStatement, mySqlConnection);
     }
-    scan.close();
-    log.info("AlphaVantage data processing complete");
-    return ServiceCodes.SUCCESS;
+
+  }
+
+  /**
+   * Sets the parameters of the prepared statement for the specified stock and then adds it to the
+   * batch.
+   * @param statement The PreparedStatement that will be executed
+   * @param stock The stock that is being added to the batch of PreparedStatements
+   */
+  private void addStockToBatch(PreparedStatement statement, DailyStockInfo stock) throws SQLException {
+    PriceData prices = stock.getPriceData();
+    statement.setString(1, stock.getTicker());
+    statement.setString(2, stock.getDate());
+    statement.setDouble(3, prices.getOpen());
+    statement.setDouble(4, prices.getHigh());
+    statement.setDouble(5, prices.getLow());
+    statement.setDouble(6, prices.getClose());
+    statement.setInt(7, prices.getVolume());
+    statement.addBatch();
   }
 
   /**
@@ -272,6 +193,25 @@ public class YahooFinanceService {
     cal.add(GregorianCalendar.DAY_OF_MONTH, days);
     SimpleDateFormat form = new SimpleDateFormat("yyyy-MM-dd");
     return form.format(cal.getTime());
+  }
+
+  /**
+   * Closes the JDBC objects to prevent memory leaks.
+   * @param resultSet Result set being closed
+   * @param statement Statement being closed
+   * @param connection Connection being closed
+   */
+  private void closeConnectionObjects(ResultSet resultSet, PreparedStatement statement,
+      Connection connection) {
+    if(resultSet != null) {
+      resultSet.close();
+    }
+    if(statement != null) {
+      statement.close();
+    }
+    if(connection != null) {
+      connection.close();
+    }
   }
 
 }

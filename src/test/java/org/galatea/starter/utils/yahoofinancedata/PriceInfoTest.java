@@ -16,7 +16,7 @@ public class PriceInfoTest {
     String[] badTickers = {"M2FT", "MSFTT",""};
     for (String badTicker : badTickers) {
       try {
-        new PriceInfo(badTicker, valDate, valDouble, valDouble, valDouble, valDouble, valInt);
+        new DailyStockInfo(badTicker, valDate, valDouble, valDouble, valDouble, valDouble, valInt);
         fail();
       } catch (IllegalArgumentException e) {
         assertEquals("Improper ticker format", e.getMessage());
@@ -30,7 +30,7 @@ public class PriceInfoTest {
         "2020-04-123","yyyy-04-14","2020-mm-14","2020-04-dd","2020/04/14"};
     for (String badDate : badDates) {
       try {
-        new PriceInfo(valTicker, badDate, valDouble, valDouble, valDouble, valDouble, valInt);
+        new DailyStockInfo(valTicker, badDate, valDouble, valDouble, valDouble, valDouble, valInt);
         fail();
       } catch (IllegalArgumentException e) {
         assertEquals("Improper date format", e.getMessage());
@@ -41,35 +41,35 @@ public class PriceInfoTest {
   @Test
   public void invalidStockValues() {
     try {
-      new PriceInfo(valTicker, valDate, -1.0, valDouble, valDouble, valDouble, valInt);
+      new DailyStockInfo(valTicker, valDate, -1.0, valDouble, valDouble, valDouble, valInt);
       fail();
     } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
     try {
-      new PriceInfo(valTicker, valDate, valDouble, -1.0, valDouble, valDouble, valInt);
+      new DailyStockInfo(valTicker, valDate, valDouble, -1.0, valDouble, valDouble, valInt);
       fail();
     } catch(IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
     try {
-      new PriceInfo(valTicker, valDate, valDouble, valDouble, -1.0, valDouble, valInt);
+      new DailyStockInfo(valTicker, valDate, valDouble, valDouble, -1.0, valDouble, valInt);
       fail();
     } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
     try {
-      new PriceInfo(valTicker, valDate, valDouble, valDouble, valDouble, -1.0, valInt);
+      new DailyStockInfo(valTicker, valDate, valDouble, valDouble, valDouble, -1.0, valInt);
       fail();
     } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());
     }
 
     try {
-      new PriceInfo(valTicker, valDate, valDouble, valDouble, valDouble, valDouble, -1);
+      new DailyStockInfo(valTicker, valDate, valDouble, valDouble, valDouble, valDouble, -1);
       fail();
     } catch (IllegalArgumentException e) {
       assertEquals("Negative stock value", e.getMessage());

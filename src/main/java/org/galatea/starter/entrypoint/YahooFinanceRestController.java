@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.sf.aspect4log.Log;
 import net.sf.aspect4log.Log.Level;
 import org.galatea.starter.service.YahooFinanceService;
-import org.galatea.starter.utils.yahoofinancedata.PriceInfo;
+import org.galatea.starter.utils.yahoofinancedata.DailyStockInfo;
 import org.galatea.starter.utils.yahoofinancedata.Request;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,7 +39,7 @@ public class YahooFinanceRestController extends BaseRestController {
    * @return List of past price information for that stock
    */
   @GetMapping("/prices")
-  public LinkedList<PriceInfo> getPriceInfo(
+  public LinkedList<DailyStockInfo> getPriceInfo(
       @RequestParam(value = "stock") final String ticker,
       @RequestParam(value = "days") final int days) {
 
@@ -47,7 +47,7 @@ public class YahooFinanceRestController extends BaseRestController {
     // TODO: Handle exceptions for invalid Request data input
     SimpleDateFormat form = new SimpleDateFormat("yyyy-MM-dd");
     Request req = new Request(ticker, days, idTracker, form.format(new Date()));
-    LinkedList<PriceInfo> res;
+    LinkedList<DailyStockInfo> res;
     try {
       res = yahooFinanceService.handleRequest(req);
     } catch (DataFormatException e) {
